@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import { AuthProvider } from "@/lib/auth";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "BGB Sports VB - Admin",
@@ -10,9 +11,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen bg-slate-50">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">{children}</main>
+      <body className="min-h-screen bg-slate-50">
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
