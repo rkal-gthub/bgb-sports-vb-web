@@ -14,9 +14,9 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       const [p, sl, se] = await Promise.all([
-        supabase.from("players").select("*").order("full_name"),
-        supabase.from("schedule_slots").select("*").order("start_time"),
-        supabase.from("sessions").select("*").order("date", { ascending: false }),
+        supabase.from("vb_players").select("*").order("full_name"),
+        supabase.from("vb_schedule_slots").select("*").order("start_time"),
+        supabase.from("vb_sessions").select("*").order("date", { ascending: false }),
       ]);
       setPlayers(p.data ?? []);
       setSlots(sl.data ?? []);
