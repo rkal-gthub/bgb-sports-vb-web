@@ -14,6 +14,46 @@ export default function PlayersPage() {
   const [modal, setModal] = useState<ModalMode>("closed");
   const [selected, setSelected] = useState<Player | null>(null);
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActing, setBulkActing] = useState(false);
+
+  const selectMode = selectedIds.size > 0;
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((p) => p.id)));
+    }
+  }
+
+  async function bulkMakeInactive() {
+    if (!confirm(`Set ${selectedIds.size} player${selectedIds.size === 1 ? "" : "s"} to Inactive?`)) return;
+    setBulkActing(true);
+    const ids = Array.from(selectedIds);
+    await supabase.from("players").update({ status: "Inactive" }).in("id", ids);
+    setSelectedIds(new Set());
+    setBulkActing(false);
+    load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Permanently delete ${selectedIds.size} player${selectedIds.size === 1 ? "" : "s"}?`)) return;
+    setBulkActing(true);
+    const ids = Array.from(selectedIds);
+    await supabase.from("players").delete().in("id", ids);
+    setSelectedIds(new Set());
+    setBulkActing(false);
+    load();
+  }
 
   const blank: Omit<Player, "id"> = {
     full_name: "", player_position: "", skill_level: "", team: "", age: null,
@@ -93,7 +133,7 @@ export default function PlayersPage() {
         </button>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-3">
         <input
           type="text" placeholder="Search players..." value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -101,10 +141,33 @@ export default function PlayersPage() {
         />
       </div>
 
+      {selectMode && (
+        <div className="mb-3 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm font-medium text-blue-800">{selectedIds.size} selected</span>
+          <button onClick={bulkMakeInactive} disabled={bulkActing}
+            className="px-3 py-1.5 text-xs font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 transition-colors">
+            Make Inactive
+          </button>
+          <button onClick={bulkDelete} disabled={bulkActing}
+            className="px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors">
+            Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-xs text-blue-600 hover:underline">
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
+              <th className="w-10 px-4 py-3">
+                <input type="checkbox" checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              </th>
               <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-slate-600">Position</th>
               <th className="text-left px-4 py-3 font-medium text-slate-600">Level</th>
@@ -116,7 +179,12 @@ export default function PlayersPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => openDetail(p)}>
+              <tr key={p.id} className={`hover:bg-slate-50 cursor-pointer ${selectedIds.has(p.id) ? "bg-blue-50" : ""}`} onClick={() => openDetail(p)}>
+                <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={selectedIds.has(p.id)}
+                    onChange={() => toggleSelect(p.id)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                </td>
                 <td className="px-4 py-3 font-medium text-slate-900">{p.full_name}</td>
                 <td className="px-4 py-3 text-slate-600">{p.player_position || "—"}</td>
                 <td className="px-4 py-3">
@@ -137,7 +205,7 @@ export default function PlayersPage() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No players found</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No players found</td></tr>
             )}
           </tbody>
         </table>
