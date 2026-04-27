@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -14,10 +14,9 @@ export default function LoginPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  if (user) {
-    router.replace("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) router.replace("/");
+  }, [user, router]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
