@@ -22,8 +22,8 @@ export default function SchedulePage() {
 
   const load = useCallback(async () => {
     const [sl, pl] = await Promise.all([
-      supabase.from("vb_schedule_slots").select("*").order("start_time"),
-      supabase.from("vb_players").select("*").order("full_name"),
+      supabase.from("schedule_slots").select("*").order("start_time"),
+      supabase.from("players").select("*").order("full_name"),
     ]);
     setSlots(sl.data ?? []);
     setPlayers(pl.data ?? []);
@@ -81,9 +81,9 @@ export default function SchedulePage() {
       max_players: form.max_players,
     };
     if (editing) {
-      await supabase.from("vb_schedule_slots").update(record).eq("id", editing.id);
+      await supabase.from("schedule_slots").update(record).eq("id", editing.id);
     } else {
-      await supabase.from("vb_schedule_slots").insert({
+      await supabase.from("schedule_slots").insert({
         id: crypto.randomUUID(),
         ...record,
         player_id: null,
@@ -100,7 +100,7 @@ export default function SchedulePage() {
 
   async function deleteSlot() {
     if (!editing || !confirm("Delete this slot?")) return;
-    await supabase.from("vb_schedule_slots").delete().eq("id", editing.id);
+    await supabase.from("schedule_slots").delete().eq("id", editing.id);
     setShowAdd(false);
     setEditing(null);
     load();
@@ -110,7 +110,7 @@ export default function SchedulePage() {
     const slot = slots.find((s) => s.id === slotId);
     if (!slot) return;
     const ids = [...(slot.player_ids ?? []), playerId];
-    await supabase.from("vb_schedule_slots").update({
+    await supabase.from("schedule_slots").update({
       player_ids: ids,
       player_id: ids[0],
       status: ids.length >= slot.max_players ? "Booked" : "Open",
@@ -123,7 +123,7 @@ export default function SchedulePage() {
     const slot = slots.find((s) => s.id === slotId);
     if (!slot) return;
     const ids = (slot.player_ids ?? []).filter((id) => id !== playerId);
-    await supabase.from("vb_schedule_slots").update({
+    await supabase.from("schedule_slots").update({
       player_ids: ids,
       player_id: ids[0] ?? null,
       status: "Open",

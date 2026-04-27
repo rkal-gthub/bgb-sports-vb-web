@@ -18,8 +18,8 @@ export default function SessionsPage() {
 
   const load = useCallback(async () => {
     const [se, pl] = await Promise.all([
-      supabase.from("vb_sessions").select("*").order("date", { ascending: false }),
-      supabase.from("vb_players").select("*").order("full_name"),
+      supabase.from("sessions").select("*").order("date", { ascending: false }),
+      supabase.from("players").select("*").order("full_name"),
     ]);
     setSessions(se.data ?? []);
     setPlayers(pl.data ?? []);
@@ -71,9 +71,9 @@ export default function SessionsPage() {
       player_id: form.player_id,
     };
     if (editing) {
-      await supabase.from("vb_sessions").update(record).eq("id", editing.id);
+      await supabase.from("sessions").update(record).eq("id", editing.id);
     } else {
-      await supabase.from("vb_sessions").insert({ id: crypto.randomUUID(), ...record });
+      await supabase.from("sessions").insert({ id: crypto.randomUUID(), ...record });
     }
     setSaving(false);
     setShowModal(false);
@@ -83,7 +83,7 @@ export default function SessionsPage() {
 
   async function deleteSession() {
     if (!editing || !confirm("Delete this session?")) return;
-    await supabase.from("vb_sessions").delete().eq("id", editing.id);
+    await supabase.from("sessions").delete().eq("id", editing.id);
     setShowModal(false);
     setEditing(null);
     load();
