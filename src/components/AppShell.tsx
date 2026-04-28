@@ -10,14 +10,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/login";
+  const isMobilePage = pathname.startsWith("/mobile");
 
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) {
+    if (!loading && !user && !isLoginPage && !isMobilePage) {
       router.replace("/login");
     }
-  }, [user, loading, isLoginPage, router]);
+  }, [user, loading, isLoginPage, isMobilePage, router]);
 
-  if (loading) {
+  if (loading && !isMobilePage) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -25,7 +26,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isLoginPage) {
+  if (isLoginPage || isMobilePage) {
     return <>{children}</>;
   }
 

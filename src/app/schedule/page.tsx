@@ -81,16 +81,16 @@ export default function SchedulePage() {
       max_players: form.max_players,
     };
     if (editing) {
-      await supabase.from("vb_schedule_slots").update(record).eq("id", editing.id);
+      const { error } = await supabase.from("vb_schedule_slots").update(record).eq("id", editing.id);
+      if (error) { console.error("update error:", error); alert(error.message); setSaving(false); return; }
     } else {
-      await supabase.from("vb_schedule_slots").insert({
+      const { error } = await supabase.from("vb_schedule_slots").insert({
         id: crypto.randomUUID(),
         ...record,
         player_id: null,
         player_ids: [],
-        availability_block_id: crypto.randomUUID(),
-        booking_group_id: null,
       });
+      if (error) { console.error("insert error:", error); alert(error.message); setSaving(false); return; }
     }
     setSaving(false);
     setShowAdd(false);
