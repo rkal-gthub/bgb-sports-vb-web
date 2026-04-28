@@ -39,7 +39,7 @@ export default function PlayersPage() {
     if (!confirm(`Set ${selectedIds.size} player${selectedIds.size === 1 ? "" : "s"} to Inactive?`)) return;
     setBulkActing(true);
     const ids = Array.from(selectedIds);
-    await supabase.from("players").update({ status: "Inactive" }).in("id", ids);
+    await supabase.from("vb_players").update({ status: "Inactive" }).in("id", ids);
     setSelectedIds(new Set());
     setBulkActing(false);
     load();
@@ -49,7 +49,7 @@ export default function PlayersPage() {
     if (!confirm(`Permanently delete ${selectedIds.size} player${selectedIds.size === 1 ? "" : "s"}?`)) return;
     setBulkActing(true);
     const ids = Array.from(selectedIds);
-    await supabase.from("players").delete().in("id", ids);
+    await supabase.from("vb_players").delete().in("id", ids);
     setSelectedIds(new Set());
     setBulkActing(false);
     load();
@@ -64,7 +64,7 @@ export default function PlayersPage() {
   const [form, setForm] = useState(blank);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("players").select("*").order("full_name");
+    const { data } = await supabase.from("vb_players").select("*").order("full_name");
     setPlayers(data ?? []);
     setLoading(false);
   }, []);
@@ -93,10 +93,10 @@ export default function PlayersPage() {
     if (modal === "add") {
       const id = crypto.randomUUID();
       const record = { id, ...form, date_created: new Date().toISOString() };
-      await supabase.from("players").insert(record);
+      await supabase.from("vb_players").insert(record);
     } else if (modal === "edit" && selected) {
       const { ...updates } = form;
-      await supabase.from("players").update(updates).eq("id", selected.id);
+      await supabase.from("vb_players").update(updates).eq("id", selected.id);
     }
     setSaving(false);
     setModal("closed");
@@ -105,7 +105,7 @@ export default function PlayersPage() {
 
   async function deletePlayer() {
     if (!selected || !confirm(`Delete ${selected.full_name}?`)) return;
-    await supabase.from("players").delete().eq("id", selected.id);
+    await supabase.from("vb_players").delete().eq("id", selected.id);
     setModal("closed");
     load();
   }
