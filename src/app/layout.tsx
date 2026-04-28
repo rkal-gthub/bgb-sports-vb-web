@@ -1,13 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
 
-import type { Viewport } from "next";
-
 export const metadata: Metadata = {
-  title: "BGB Sports VB - Admin",
-  description: "Elite Volleyball Development Admin Dashboard",
+  title: "BGB Sports VB",
+  description: "Volleyball coaching management platform",
 };
 
 export const viewport: Viewport = {
@@ -19,7 +17,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50">
+      <body className="min-h-screen flex flex-col bg-gray-50 text-gray-900 antialiased">
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

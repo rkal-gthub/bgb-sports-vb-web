@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import Sidebar from "./Sidebar";
+import Nav from "./Nav";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -20,8 +20,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loading && !isMobilePage) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Loading...</p>
       </div>
     );
   }
@@ -33,9 +33,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
+    <>
+      <Nav />
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
+        {children}
+      </main>
+    </>
   );
 }
