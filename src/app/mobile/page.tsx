@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, ScheduleSlot, Session } from "@/lib/types";
 import { SLOT_TYPES } from "@/lib/types";
+import { getPlayerIds, getMaxPlayers } from "@/lib/helpers";
 
 type Tab = "dashboard" | "schedule" | "players" | "sessions";
 
@@ -125,12 +126,12 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart.getTime() + 86400000);
   const upcoming = slots.filter((s) => new Date(s.start_time) > now);
-  const nextBooked = upcoming.find((s) => s.player_ids?.length > 0);
+  const nextBooked = upcoming.find((s) => getPlayerIds(s).length > 0);
   const todaySlots = slots.filter((s) => { const t = new Date(s.start_time); return t >= todayStart && t < todayEnd; });
   const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const thisWeekSessions = sessions.filter((s) => new Date(s.date) >= weekStart);
-  const openSlots = upcoming.filter((s) => (s.player_ids?.length ?? 0) < s.max_players);
-  const bookedSlots = upcoming.filter((s) => s.player_ids?.length > 0);
+  const openSlots = upcoming.filter((s) => getPlayerIds(s).length < getMaxPlayers(s));
+  const bookedSlots = upcoming.filter((s) => getPlayerIds(s).length > 0);
   const recentSessions = sessions.slice(0, 5);
 
   return (
@@ -155,7 +156,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
             <p className="text-2xl font-bold">{formatTime(nextBooked.start_time)}</p>
             <p className="text-blue-100 text-sm">{nextBooked.location} &middot; {formatDate(nextBooked.start_time)}</p>
             <div className="mt-2 flex flex-wrap gap-1">
-              {nextBooked.player_ids?.map((id) => (
+              {getPlayerIds(nextBooked).map((id) => (
                 <span key={id} className="text-sm bg-white/15 px-2 py-0.5 rounded-full">{playerName(id)}</span>
               ))}
             </div>
@@ -208,7 +209,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
                     <p className="text-xs text-slate-500 mt-0.5">{slot.location}</p>
                   </div>
                   <div className="text-right">
-                    {slot.player_ids?.length > 0 ? slot.player_ids.map((id) => (
+                    {getPlayerIds(slot).length > 0 ? getPlayerIds(slot).map((id) => (
                       <p key={id} className="text-xs font-medium text-slate-700">{playerName(id)}</p>
                     )) : <span className="text-xs text-green-600 font-medium">Open</span>}
                   </div>
@@ -318,12 +319,12 @@ function ScheduleTab({ slots, playerName, formatTime, formatDate, reload }: {
                       <p className="text-xs text-slate-500 mt-0.5">{slot.location}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      (slot.player_ids?.length ?? 0) >= slot.max_players ? "bg-orange-50 text-orange-700" : "bg-green-50 text-green-700"
-                    }`}>{slot.player_ids?.length ?? 0}/{slot.max_players}</span>
+                      getPlayerIds(slot).length >= getMaxPlayers(slot) ? "bg-orange-50 text-orange-700" : "bg-green-50 text-green-700"
+                    }`}>{getPlayerIds(slot).length}/{getMaxPlayers(slot)}</span>
                   </div>
-                  {(slot.player_ids?.length ?? 0) > 0 && (
+                  {getPlayerIds(slot).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {slot.player_ids.map((id) => (
+                      {getPlayerIds(slot).map((id) => (
                         <span key={id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{playerName(id)}</span>
                       ))}
                     </div>

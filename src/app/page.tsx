@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import type { Player, ScheduleSlot, Session } from "@/lib/types";
+import { getPlayerIds, getMaxPlayers } from "@/lib/helpers";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -32,10 +33,10 @@ export default function Dashboard() {
   const todayStr = now.toISOString().slice(0, 10);
 
   const todaySlots = slots.filter((s) => s.start_time.startsWith(todayStr));
-  const bookedToday = todaySlots.filter((s) => (s.player_ids?.length ?? 0) > 0);
+  const bookedToday = todaySlots.filter((s) => getPlayerIds(s).length > 0);
 
   const upNext = slots.find(
-    (s) => new Date(s.start_time) >= now && (s.player_ids?.length ?? 0) > 0
+    (s) => new Date(s.start_time) >= now && getPlayerIds(s).length > 0
   );
 
   const weekAgo = new Date(now);
@@ -43,7 +44,7 @@ export default function Dashboard() {
   const thisWeekSessions = sessions.filter((s) => new Date(s.date) >= weekAgo);
 
   const upcomingBooked = slots.filter(
-    (s) => new Date(s.start_time) >= now && (s.player_ids?.length ?? 0) > 0
+    (s) => new Date(s.start_time) >= now && getPlayerIds(s).length > 0
   );
 
   const recentSessions = sessions.slice(0, 5);
@@ -85,7 +86,7 @@ export default function Dashboard() {
             {upNext.slot_type && ` · ${upNext.slot_type}`}
           </p>
           <p className="text-sm mt-2">
-            {upNext.player_ids?.map(playerName).join(", ")}
+            {getPlayerIds(upNext).map(playerName).join(", ")}
           </p>
         </div>
       )}
@@ -95,7 +96,8 @@ export default function Dashboard() {
           <h2 className="font-semibold text-lg">Today&apos;s Schedule ({todaySlots.length})</h2>
           <div className="space-y-2">
             {todaySlots.map((slot) => {
-              const booked = (slot.player_ids?.length ?? 0) > 0;
+              const pids = getPlayerIds(slot);
+              const booked = pids.length > 0;
               return (
                 <div key={slot.id} className="flex justify-between items-center border border-gray-100 rounded-lg p-3">
                   <div>
@@ -109,7 +111,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right text-sm">
                     {booked ? (
-                      <span className="text-green-600 font-medium">{slot.player_ids.length}/{slot.max_players}</span>
+                      <span className="text-green-600 font-medium">{pids.length}/{getMaxPlayers(slot)}</span>
                     ) : (
                       <span className="text-gray-800">Open</span>
                     )}

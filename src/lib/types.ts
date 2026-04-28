@@ -27,9 +27,9 @@ export interface ScheduleSlot {
   location: string;
   status: string;
   slot_type: string | null;
-  max_players: number;
+  max_players: number | null;
   player_id: string | null;
-  player_ids: string[];
+  player_ids: string[] | string | null;
   availability_block_id: string;
   booking_group_id: string | null;
 }
