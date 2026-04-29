@@ -394,8 +394,11 @@ function BookSessionSheet({ players, onClose, reload }: {
 
   async function book() {
     if (!selectedPlayer) return;
-    setSaving(true);
     const startDate = new Date(`${form.date}T${form.time}:00`);
+    if (startDate < new Date()) {
+      if (!confirm("This date and time have already passed. Book anyway?")) return;
+    }
+    setSaving(true);
     const endDate = new Date(startDate.getTime() + 3600000);
     const blockId = crypto.randomUUID();
 
