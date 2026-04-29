@@ -424,87 +424,79 @@ function BookSessionSheet({ players, onClose, reload }: {
         <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
 
         {step === 1 ? (
-          <>
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <h2 className="text-lg font-bold text-slate-900 mb-4">Select Player</h2>
-              {activePlayers.length === 0 ? (
-                <p className="text-slate-400 text-sm text-center py-6">No active players. Add one first.</p>
-              ) : (
-                <div className="space-y-2">
-                  {activePlayers.map((p) => (
-                    <button key={p.id} onClick={() => { setSelectedPlayer(p); setStep(2); }}
-                      className="w-full text-left bg-slate-50 rounded-xl p-3 active:bg-slate-100">
-                      <p className="font-medium text-slate-900 text-sm">{p.full_name}</p>
-                      <p className="text-xs text-slate-500">
-                        {[p.player_position, p.skill_level, p.team].filter(Boolean).join(" · ") || "No details"}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
-              <button onClick={onClose} className="w-full px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
-            </div>
-          </>
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Select Player</h2>
+            {activePlayers.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center py-6">No active players. Add one first.</p>
+            ) : (
+              <div className="space-y-2">
+                {activePlayers.map((p) => (
+                  <button key={p.id} onClick={() => { setSelectedPlayer(p); setStep(2); }}
+                    className="w-full text-left bg-slate-50 rounded-xl p-3 active:bg-slate-100">
+                    <p className="font-medium text-slate-900 text-sm">{p.full_name}</p>
+                    <p className="text-xs text-slate-500">
+                      {[p.player_position, p.skill_level, p.team].filter(Boolean).join(" · ") || "No details"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={onClose} className="w-full mt-4 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium pb-[max(1rem,env(safe-area-inset-bottom))]">Cancel</button>
+          </div>
         ) : (
-          <>
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-slate-900">Book Session</h2>
-                <button onClick={() => setStep(1)} className="text-sm text-blue-600">Change Player</button>
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-900">Book Session</h2>
+              <button onClick={() => setStep(1)} className="text-sm text-blue-600">Change Player</button>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-3 mb-4">
+              <p className="font-medium text-blue-900 text-sm">{selectedPlayer?.full_name}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Date</label>
+                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
               </div>
-              <div className="bg-blue-50 rounded-xl p-3 mb-4">
-                <p className="font-medium text-blue-900 text-sm">{selectedPlayer?.full_name}</p>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Start Time</label>
+                <select value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                  {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Date</label>
-                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Duration</label>
+                  <div className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-500 bg-slate-50">1 hour</div>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Max Players</label>
+                  <input type="number" min={1} max={30} value={form.max_players} onChange={(e) => setForm({ ...form, max_players: parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Start Time</label>
-                  <select value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
-                    {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-500 mb-1">Duration</label>
-                    <div className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-500 bg-slate-50">1 hour</div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-500 mb-1">Max Players</label>
-                    <input type="number" min={1} max={30} value={form.max_players} onChange={(e) => setForm({ ...form, max_players: parseInt(e.target.value) || 1 })}
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Location</label>
-                  <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Main Gym"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Type</label>
-                  <select value={form.slot_type} onChange={(e) => setForm({ ...form, slot_type: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
-                    {SLOT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Location</label>
+                <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Main Gym"
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Type</label>
+                <select value={form.slot_type} onChange={(e) => setForm({ ...form, slot_type: e.target.value })}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                  {SLOT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
             </div>
-            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
-              <div className="flex gap-2">
-                <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
-                <button onClick={book} disabled={!form.location || saving}
-                  className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
-                  {saving ? "Booking..." : "Book Session"}
-                </button>
-              </div>
+            <div className="flex gap-2 mt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
+              <button onClick={book} disabled={!form.location || saving}
+                className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
+                {saving ? "Booking..." : "Book Session"}
+              </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -629,9 +621,8 @@ function EditBookingSheet({ slot, players, playerName, formatTime, onClose, relo
               </div>
             </div>
           )}
-        </div>
-        <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
-          <div className="flex gap-2">
+
+          <div className="flex gap-2 mt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button onClick={() => setShowConfirm(true)} disabled={deleting}
               className="flex-1 px-4 py-2.5 text-sm text-red-600 bg-red-50 rounded-xl font-medium">
               {deleting ? "Deleting..." : "Delete"}
@@ -769,9 +760,7 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
                 </div>
               </div>
-            </div>
-            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
                 <button onClick={save} disabled={!form.full_name || saving}
                   className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
@@ -887,9 +876,7 @@ function SessionsTab({ sessions, slots, players, playerName, formatShortDate, re
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm resize-none" />
                 </div>
               </div>
-            </div>
-            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <button onClick={() => setShowLog(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
                 <button onClick={save} disabled={!form.player_id || !form.date || !form.focus || saving}
                   className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
