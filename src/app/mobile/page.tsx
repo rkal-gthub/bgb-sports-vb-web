@@ -399,12 +399,12 @@ function BookSessionSheet({ players, onClose, reload }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-t-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: 'calc(100dvh - 3rem)' }} onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
 
         {step === 1 ? (
           <>
-            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+            <div className="flex-1 overflow-y-scroll px-5 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <h2 className="text-lg font-bold text-slate-900 mb-4">Select Player</h2>
               {activePlayers.length === 0 ? (
                 <p className="text-slate-400 text-sm text-center py-6">No active players. Add one first.</p>
@@ -428,7 +428,7 @@ function BookSessionSheet({ players, onClose, reload }: {
           </>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+            <div className="flex-1 overflow-y-scroll px-5 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-slate-900">Book Session</h2>
                 <button onClick={() => setStep(1)} className="text-sm text-blue-600">Change Player</button>
@@ -546,9 +546,9 @@ function EditBookingSheet({ slot, players, playerName, formatTime, onClose, relo
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-t-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: 'calc(100dvh - 3rem)' }} onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
-        <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+        <div className="flex-1 overflow-y-scroll px-5 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           <h2 className="text-lg font-bold text-slate-900 mb-4">Booking Details</h2>
 
           <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2">
@@ -704,9 +704,9 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowAdd(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: 'calc(100dvh - 3rem)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
-            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+            <div className="flex-1 overflow-y-scroll px-5 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <h2 className="text-lg font-bold text-slate-900 mb-4">Add Player</h2>
               <div className="space-y-3">
                 <div>
@@ -826,9 +826,9 @@ function SessionsTab({ sessions, slots, players, playerName, formatShortDate, re
 
       {showLog && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowLog(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: 'calc(100dvh - 3rem)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
-            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+            <div className="flex-1 overflow-y-scroll px-5 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <h2 className="text-lg font-bold text-slate-900 mb-4">Log Session</h2>
               <div className="space-y-3">
                 <div>
