@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, ScheduleSlot, Session } from "@/lib/types";
-import { SLOT_TYPES } from "@/lib/types";
+import { SLOT_TYPES, POSITIONS, SKILL_LEVELS, HANDS } from "@/lib/types";
 import { getPlayerIds, getMaxPlayers } from "@/lib/helpers";
 
 type Tab = "dashboard" | "schedule" | "players" | "sessions";
@@ -14,6 +14,7 @@ export default function MobileApp() {
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDashboardBook, setShowDashboardBook] = useState(false);
 
   const load = useCallback(async () => {
     const [p, sl, se] = await Promise.all([
@@ -45,6 +46,15 @@ export default function MobileApp() {
     return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
   }
 
+  function dedup(slotsArr: ScheduleSlot[]): ScheduleSlot[] {
+    const seen = new Set<string>();
+    return slotsArr.filter((s) => {
+      if (seen.has(s.availability_block_id)) return false;
+      seen.add(s.availability_block_id);
+      return true;
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -56,10 +66,13 @@ export default function MobileApp() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <div className="flex-1 overflow-auto pb-20">
-        {tab === "dashboard" && <DashboardTab players={players} slots={slots} sessions={sessions} playerName={playerName} formatTime={formatTime} formatDate={formatDate} formatShortDate={formatShortDate} setTab={setTab} />}
-        {tab === "schedule" && <ScheduleTab slots={slots} playerName={playerName} formatTime={formatTime} formatDate={formatDate} reload={load} />}
+        {tab === "dashboard" && <>
+          <DashboardTab players={players} slots={slots} sessions={sessions} playerName={playerName} formatTime={formatTime} formatDate={formatDate} formatShortDate={formatShortDate} setTab={setTab} dedup={dedup} onBook={() => setShowDashboardBook(true)} />
+          {showDashboardBook && <BookSessionSheet players={players} onClose={() => setShowDashboardBook(false)} reload={load} />}
+        </>}
+        {tab === "schedule" && <ScheduleTab slots={slots} players={players} playerName={playerName} formatTime={formatTime} formatDate={formatDate} reload={load} dedup={dedup} />}
         {tab === "players" && <PlayersTab players={players} reload={load} />}
-        {tab === "sessions" && <SessionsTab sessions={sessions} players={players} playerName={playerName} formatShortDate={formatShortDate} reload={load} />}
+        {tab === "sessions" && <SessionsTab sessions={sessions} slots={slots} players={players} playerName={playerName} formatShortDate={formatShortDate} reload={load} dedup={dedup} setTab={setTab} />}
       </div>
 
       <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex safe-bottom z-50">
@@ -114,31 +127,57 @@ function ClipboardIcon({ filled }: { filled: boolean }) {
   );
 }
 
+// ─── Time Options ───────────────────────────────────────────────────────────
+
+function timeOptions() {
+  const opts: { label: string; value: string }[] = [];
+  for (let h = 5; h <= 23; h++) {
+    for (const m of [0, 30]) {
+      const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const ampm = h >= 12 ? "PM" : "AM";
+      const label = `${hh}:${String(m).padStart(2, "0")} ${ampm}`;
+      const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      opts.push({ label, value });
+    }
+  }
+  return opts;
+}
+
+const TIME_OPTIONS = timeOptions();
+
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
-function DashboardTab({ players, slots, sessions, playerName, formatTime, formatDate, formatShortDate, setTab }: {
+function DashboardTab({ players, slots, sessions, playerName, formatTime, formatDate, formatShortDate, setTab, dedup, onBook }: {
   players: Player[]; slots: ScheduleSlot[]; sessions: Session[];
   playerName: (id: string) => string; formatTime: (s: string) => string;
   formatDate: (s: string) => string; formatShortDate: (s: string) => string;
-  setTab: (t: Tab) => void;
+  setTab: (t: Tab) => void; dedup: (s: ScheduleSlot[]) => ScheduleSlot[];
+  onBook: () => void;
 }) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart.getTime() + 86400000);
-  const upcoming = slots.filter((s) => new Date(s.start_time) > now);
+  const dedupSlots = dedup(slots);
+  const upcoming = dedupSlots.filter((s) => new Date(s.start_time) > now);
   const nextBooked = upcoming.find((s) => getPlayerIds(s).length > 0);
-  const todaySlots = slots.filter((s) => { const t = new Date(s.start_time); return t >= todayStart && t < todayEnd; });
+  const todaySlots = dedupSlots.filter((s) => { const t = new Date(s.start_time); return t >= todayStart && t < todayEnd; });
   const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const thisWeekSessions = sessions.filter((s) => new Date(s.date) >= weekStart);
-  const openSlots = upcoming.filter((s) => getPlayerIds(s).length < getMaxPlayers(s));
-  const bookedSlots = upcoming.filter((s) => getPlayerIds(s).length > 0);
+  const openSpots = upcoming.filter((s) => getPlayerIds(s).length < getMaxPlayers(s))
+    .reduce((sum, s) => sum + (getMaxPlayers(s) - getPlayerIds(s).length), 0);
+  const bookedCount = upcoming.filter((s) => getPlayerIds(s).length > 0).length;
   const recentSessions = sessions.slice(0, 5);
 
   return (
     <div className="px-4 pt-6">
-      <div className="flex items-center gap-3 mb-5">
-        <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-lg" />
-        <h1 className="text-xl font-bold text-slate-900">BGB Sports VB</h1>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-lg" />
+          <h1 className="text-xl font-bold text-slate-900">BGB Sports VB</h1>
+        </div>
+        <button onClick={onBook} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">
+          + Book
+        </button>
       </div>
 
       {nextBooked && (
@@ -177,12 +216,12 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
         </button>
         <button onClick={() => setTab("schedule")} className="bg-white rounded-xl p-4 border border-slate-200 text-left active:bg-slate-50">
           <CalendarIcon filled={false} />
-          <p className="text-2xl font-bold text-slate-900 mt-2">{openSlots.length}</p>
-          <p className="text-xs text-slate-500">Open Slots</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{openSpots}</p>
+          <p className="text-xs text-slate-500">Open Spots</p>
         </button>
         <button onClick={() => setTab("schedule")} className="bg-white rounded-xl p-4 border border-slate-200 text-left active:bg-slate-50">
           <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{bookedSlots.length}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{bookedCount}</p>
           <p className="text-xs text-slate-500">Booked</p>
         </button>
       </div>
@@ -193,9 +232,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
           <button onClick={() => setTab("schedule")} className="text-sm text-blue-600">See All</button>
         </div>
         {todaySlots.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-            No sessions today
-          </div>
+          <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">No sessions today</div>
         ) : (
           <div className="space-y-2">
             {todaySlots.map((slot) => (
@@ -226,9 +263,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
           <button onClick={() => setTab("sessions")} className="text-sm text-blue-600">See All</button>
         </div>
         {recentSessions.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-            No sessions logged
-          </div>
+          <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">No sessions logged</div>
         ) : (
           <div className="space-y-2">
             {recentSessions.map((s) => (
@@ -254,66 +289,45 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
 
 // ─── Schedule Tab ───────────────────────────────────────────────────────────
 
-function ScheduleTab({ slots, playerName, formatTime, formatDate, reload }: {
-  slots: ScheduleSlot[]; playerName: (id: string) => string;
+function ScheduleTab({ slots, players, playerName, formatTime, formatDate, reload, dedup }: {
+  slots: ScheduleSlot[]; players: Player[]; playerName: (id: string) => string;
   formatTime: (s: string) => string; formatDate: (s: string) => string;
-  reload: () => Promise<void>;
+  reload: () => Promise<void>; dedup: (s: ScheduleSlot[]) => ScheduleSlot[];
 }) {
-  const [showAdd, setShowAdd] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const blankForm = { start_time: "", end_time: "", location: "", slot_type: "", max_players: 4 };
-  const [form, setForm] = useState(blankForm);
+  const [showBook, setShowBook] = useState(false);
+  const [editSlot, setEditSlot] = useState<ScheduleSlot | null>(null);
 
+  const dedupSlots = dedup(slots);
   const now = new Date();
-  const upcoming = slots.filter((s) => new Date(s.start_time) >= now);
+  const upcoming = dedupSlots.filter((s) => new Date(s.start_time) >= now);
   const grouped = upcoming.reduce<Record<string, ScheduleSlot[]>>((acc, slot) => {
     const key = formatDate(slot.start_time);
     (acc[key] ??= []).push(slot);
     return acc;
   }, {});
 
-  async function save() {
-    setSaving(true);
-    const { error } = await supabase.from("vb_schedule_slots").insert({
-      id: crypto.randomUUID(),
-      start_time: new Date(form.start_time).toISOString(),
-      end_time: new Date(form.end_time).toISOString(),
-      location: form.location,
-      status: "Open",
-      slot_type: form.slot_type || null,
-      max_players: form.max_players,
-      player_id: null,
-      player_ids: [],
-    });
-    setSaving(false);
-    if (error) { alert(error.message); return; }
-    setShowAdd(false);
-    setForm(blankForm);
-    reload();
-  }
-
   return (
     <div className="px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-bold text-slate-900">Schedule</h1>
-        <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">
-          + Add Slot
+        <button onClick={() => setShowBook(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">
+          + Book
         </button>
       </div>
 
       {Object.keys(grouped).length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">No upcoming slots</div>
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">No upcoming bookings</div>
       ) : (
         Object.entries(grouped).map(([date, dateSlots]) => (
           <div key={date} className="mb-5">
             <h2 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">{date}</h2>
             <div className="space-y-2">
               {dateSlots.map((slot) => (
-                <div key={slot.id} className="bg-white rounded-xl border border-slate-200 p-3">
+                <button key={slot.id} onClick={() => setEditSlot(slot)} className="w-full text-left bg-white rounded-xl border border-slate-200 p-3 active:bg-slate-50">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 text-sm">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</span>
+                        <span className="font-semibold text-slate-900 text-sm">{formatTime(slot.start_time)} – {formatTime(slot.end_time)}</span>
                         {slot.slot_type && <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">{slot.slot_type}</span>}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{slot.location}</p>
@@ -329,60 +343,281 @@ function ScheduleTab({ slots, playerName, formatTime, formatDate, reload }: {
                       ))}
                     </div>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           </div>
         ))
       )}
 
-      {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowAdd(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Add Slot</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Start</label>
-                <input type="datetime-local" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+      {showBook && <BookSessionSheet players={players} onClose={() => setShowBook(false)} reload={reload} />}
+      {editSlot && <EditBookingSheet slot={editSlot} players={players} playerName={playerName} formatTime={formatTime} onClose={() => { setEditSlot(null); reload(); }} reload={reload} />}
+    </div>
+  );
+}
+
+// ─── Book Session Sheet (two-step wizard) ───────────────────────────────────
+
+function BookSessionSheet({ players, onClose, reload }: {
+  players: Player[]; onClose: () => void; reload: () => Promise<void>;
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const [form, setForm] = useState({ date: dateStr, time: "09:00", location: "", slot_type: SLOT_TYPES[0], max_players: 4 });
+
+  const activePlayers = players.filter((p) => (p.status ?? "Active") === "Active");
+
+  async function book() {
+    if (!selectedPlayer) return;
+    setSaving(true);
+    const startDate = new Date(`${form.date}T${form.time}:00`);
+    const endDate = new Date(startDate.getTime() + 3600000);
+    const blockId = crypto.randomUUID();
+
+    const { error } = await supabase.from("vb_schedule_slots").insert({
+      id: crypto.randomUUID(),
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
+      location: form.location,
+      status: "Booked",
+      slot_type: form.slot_type || null,
+      max_players: form.max_players,
+      player_id: selectedPlayer.id,
+      player_ids: [selectedPlayer.id],
+      availability_block_id: blockId,
+      booking_group_id: null,
+    });
+    setSaving(false);
+    if (error) { alert(error.message); return; }
+    await reload();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
+
+        {step === 1 ? (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Select Player</h2>
+              {activePlayers.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-6">No active players. Add one first.</p>
+              ) : (
+                <div className="space-y-2">
+                  {activePlayers.map((p) => (
+                    <button key={p.id} onClick={() => { setSelectedPlayer(p); setStep(2); }}
+                      className="w-full text-left bg-slate-50 rounded-xl p-3 active:bg-slate-100">
+                      <p className="font-medium text-slate-900 text-sm">{p.full_name}</p>
+                      <p className="text-xs text-slate-500">
+                        {[p.player_position, p.skill_level, p.team].filter(Boolean).join(" · ") || "No details"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
+              <button onClick={onClose} className="w-full px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-slate-900">Book Session</h2>
+                <button onClick={() => setStep(1)} className="text-sm text-blue-600">Change Player</button>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">End</label>
-                <input type="datetime-local" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+              <div className="bg-blue-50 rounded-xl p-3 mb-4">
+                <p className="font-medium text-blue-900 text-sm">{selectedPlayer?.full_name}</p>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Location</label>
-                <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Date</label>
+                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Start Time</label>
+                  <select value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                    {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs text-slate-500 mb-1">Duration</label>
+                    <div className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-500 bg-slate-50">1 hour</div>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-slate-500 mb-1">Max Players</label>
+                    <input type="number" min={1} max={30} value={form.max_players} onChange={(e) => setForm({ ...form, max_players: parseInt(e.target.value) || 1 })}
+                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Location</label>
+                  <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Main Gym"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Type</label>
                   <select value={form.slot_type} onChange={(e) => setForm({ ...form, slot_type: e.target.value })}
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
-                    <option value="">Select...</option>
                     {SLOT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Max Players</label>
-                  <input type="number" min={1} value={form.max_players} onChange={(e) => setForm({ ...form, max_players: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-                </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
-              <button onClick={save} disabled={!form.start_time || !form.end_time || !form.location || saving}
-                className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
-                {saving ? "Saving..." : "Save"}
-              </button>
+            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
+                <button onClick={book} disabled={!form.location || saving}
+                  className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
+                  {saving ? "Booking..." : "Book Session"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Booking Sheet ─────────────────────────────────────────────────────
+
+function EditBookingSheet({ slot, players, playerName, formatTime, onClose, reload }: {
+  slot: ScheduleSlot; players: Player[]; playerName: (id: string) => string;
+  formatTime: (s: string) => string; onClose: () => void; reload: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [addPlayerId, setAddPlayerId] = useState("");
+
+  const pids = getPlayerIds(slot);
+  const maxP = getMaxPlayers(slot);
+  const availablePlayers = players.filter((p) => (p.status ?? "Active") === "Active" && !pids.includes(p.id));
+
+  async function addPlayer() {
+    if (!addPlayerId) return;
+    setSaving(true);
+    const newIds = [...pids, addPlayerId];
+    const { error } = await supabase.from("vb_schedule_slots").update({
+      player_ids: newIds,
+      player_id: newIds[0],
+      status: "Booked",
+    }).eq("availability_block_id", slot.availability_block_id);
+    setSaving(false);
+    if (error) { alert(error.message); return; }
+    setAddPlayerId("");
+    await reload();
+    onClose();
+  }
+
+  async function removePlayer(pid: string) {
+    setSaving(true);
+    const newIds = pids.filter((id) => id !== pid);
+    const { error } = await supabase.from("vb_schedule_slots").update({
+      player_ids: newIds,
+      player_id: newIds[0] ?? null,
+      status: newIds.length > 0 ? "Booked" : "Open",
+    }).eq("availability_block_id", slot.availability_block_id);
+    setSaving(false);
+    if (error) { alert(error.message); return; }
+    await reload();
+    onClose();
+  }
+
+  async function deleteBooking() {
+    setDeleting(true);
+    const { error } = await supabase.from("vb_schedule_slots").delete().eq("availability_block_id", slot.availability_block_id);
+    setDeleting(false);
+    if (error) { alert(error.message); return; }
+    await reload();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
+        <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Booking Details</h2>
+
+          <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-slate-500">Time</span>
+              <span className="text-sm font-medium text-slate-900">{formatTime(slot.start_time)} – {formatTime(slot.end_time)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-slate-500">Location</span>
+              <span className="text-sm font-medium text-slate-900">{slot.location}</span>
+            </div>
+            {slot.slot_type && (
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">Type</span>
+                <span className="text-sm font-medium text-slate-900">{slot.slot_type}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-sm text-slate-500">Capacity</span>
+              <span className="text-sm font-medium text-slate-900">{pids.length}/{maxP}</span>
             </div>
           </div>
+
+          <h3 className="text-sm font-semibold text-slate-700 mb-2">Players ({pids.length})</h3>
+          {pids.length === 0 ? (
+            <p className="text-xs text-slate-400 mb-3">No players assigned</p>
+          ) : (
+            <div className="space-y-2 mb-3">
+              {pids.map((pid) => (
+                <div key={pid} className="flex items-center justify-between bg-green-50 rounded-xl px-3 py-2">
+                  <span className="text-sm font-medium text-green-900">{playerName(pid)}</span>
+                  <button onClick={() => removePlayer(pid)} disabled={saving} className="text-xs text-red-600 font-medium">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pids.length < maxP && availablePlayers.length > 0 && (
+            <div className="flex gap-2 mb-4">
+              <select value={addPlayerId} onChange={(e) => setAddPlayerId(e.target.value)}
+                className="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                <option value="">Add player...</option>
+                {availablePlayers.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              </select>
+              <button onClick={addPlayer} disabled={!addPlayerId || saving}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-50">Add</button>
+            </div>
+          )}
+
+          {showConfirm && (
+            <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-sm text-red-800 mb-3">Delete this booking? This cannot be undone.</p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowConfirm(false)} className="flex-1 px-3 py-2 text-sm bg-white rounded-lg border border-slate-200">Cancel</button>
+                <button onClick={deleteBooking} disabled={deleting} className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg font-medium">Confirm Delete</button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
+          <div className="flex gap-2">
+            <button onClick={() => setShowConfirm(true)} disabled={deleting}
+              className="flex-1 px-4 py-2.5 text-sm text-red-600 bg-red-50 rounded-xl font-medium">
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+            <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Close</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -393,14 +628,14 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ full_name: "", team: "", player_position: "", skill_level: "" });
+  const [form, setForm] = useState({ full_name: "", team: "", player_position: "", skill_level: "", shoots: "" });
 
   const filtered = players.filter((p) =>
     p.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (p.team ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const active = filtered.filter((p) => p.status !== "Inactive");
+  const active = filtered.filter((p) => (p.status ?? "Active") !== "Inactive");
   const inactive = filtered.filter((p) => p.status === "Inactive");
 
   async function save() {
@@ -411,12 +646,13 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
       team: form.team || null,
       player_position: form.player_position || null,
       skill_level: form.skill_level || null,
+      shoots: form.shoots || null,
       status: "Active",
     });
     setSaving(false);
     if (error) { alert(error.message); return; }
     setShowAdd(false);
-    setForm({ full_name: "", team: "", player_position: "", skill_level: "" });
+    setForm({ full_name: "", team: "", player_position: "", skill_level: "", shoots: "" });
     reload();
   }
 
@@ -424,9 +660,7 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
     <div className="px-4 pt-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-slate-900">Players</h1>
-        <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">
-          + Add
-        </button>
+        <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">+ Add</button>
       </div>
 
       <input type="text" placeholder="Search players..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -445,6 +679,7 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
                     <div className="flex items-center gap-2 mt-0.5">
                       {p.player_position && <span className="text-xs text-slate-500">{p.player_position}</span>}
                       {p.team && <span className="text-xs text-slate-400">{p.team}</span>}
+                      {p.shoots && <span className="text-xs text-slate-400">{p.shoots}</span>}
                     </div>
                   </div>
                   {p.skill_level && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{p.skill_level}</span>}
@@ -469,37 +704,57 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowAdd(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Add Player</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Full Name</label>
-                <input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Team</label>
-                <input type="text" value={form.team} onChange={(e) => setForm({ ...form, team: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Position</label>
-                <input type="text" value={form.player_position} onChange={(e) => setForm({ ...form, player_position: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Skill Level</label>
-                <input type="text" value={form.skill_level} onChange={(e) => setForm({ ...form, skill_level: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+          <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
+            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Add Player</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Full Name</label>
+                  <input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Position</label>
+                  <select value={form.player_position} onChange={(e) => setForm({ ...form, player_position: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                    <option value="">Select...</option>
+                    {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Skill Level</label>
+                    <select value={form.skill_level} onChange={(e) => setForm({ ...form, skill_level: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                      <option value="">Select...</option>
+                      {SKILL_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Hand</label>
+                    <select value={form.shoots} onChange={(e) => setForm({ ...form, shoots: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                      <option value="">Select...</option>
+                      {HANDS.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Team</label>
+                  <input type="text" value={form.team} onChange={(e) => setForm({ ...form, team: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
-              <button onClick={save} disabled={!form.full_name || saving}
-                className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
-                {saving ? "Saving..." : "Save"}
-              </button>
+            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
+              <div className="flex gap-2">
+                <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
+                <button onClick={save} disabled={!form.full_name || saving}
+                  className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -510,11 +765,12 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
 
 // ─── Sessions Tab ───────────────────────────────────────────────────────────
 
-function SessionsTab({ sessions, players, playerName, formatShortDate, reload }: {
-  sessions: Session[]; players: Player[]; playerName: (id: string) => string;
+function SessionsTab({ sessions, slots, players, playerName, formatShortDate, reload, dedup, setTab }: {
+  sessions: Session[]; slots: ScheduleSlot[]; players: Player[]; playerName: (id: string) => string;
   formatShortDate: (s: string) => string; reload: () => Promise<void>;
+  dedup: (s: ScheduleSlot[]) => ScheduleSlot[]; setTab: (t: Tab) => void;
 }) {
-  const [showAdd, setShowAdd] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const [saving, setSaving] = useState(false);
   const blankForm = { player_id: "", date: "", session_type: "", focus: "", notes: "" };
   const [form, setForm] = useState(blankForm);
@@ -531,7 +787,7 @@ function SessionsTab({ sessions, players, playerName, formatShortDate, reload }:
     });
     setSaving(false);
     if (error) { alert(error.message); return; }
-    setShowAdd(false);
+    setShowLog(false);
     setForm(blankForm);
     reload();
   }
@@ -540,9 +796,10 @@ function SessionsTab({ sessions, players, playerName, formatShortDate, reload }:
     <div className="px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-bold text-slate-900">Sessions</h1>
-        <button onClick={() => setShowAdd(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">
-          + Log
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setTab("schedule")} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium active:bg-blue-700">+ Book</button>
+          <button onClick={() => setShowLog(true)} className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium active:bg-slate-200">+ Log</button>
+        </div>
       </div>
 
       {sessions.length === 0 ? (
@@ -567,50 +824,54 @@ function SessionsTab({ sessions, players, playerName, formatShortDate, reload }:
         </div>
       )}
 
-      {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowAdd(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Log Session</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Player</label>
-                <select value={form.player_id} onChange={(e) => setForm({ ...form, player_id: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
-                  <option value="">Select player...</option>
-                  {players.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Date</label>
-                <input type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Type</label>
-                <select value={form.session_type} onChange={(e) => setForm({ ...form, session_type: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
-                  <option value="">Select...</option>
-                  {SLOT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Focus</label>
-                <input type="text" value={form.focus} onChange={(e) => setForm({ ...form, focus: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Notes</label>
-                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm resize-none" />
+      {showLog && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowLog(false)}>
+          <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-3 shrink-0" />
+            <div className="flex-1 overflow-y-auto px-5 overscroll-contain">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Log Session</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Player</label>
+                  <select value={form.player_id} onChange={(e) => setForm({ ...form, player_id: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                    <option value="">Select player...</option>
+                    {players.filter((p) => (p.status ?? "Active") !== "Inactive").map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Date</label>
+                  <input type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Type</label>
+                  <select value={form.session_type} onChange={(e) => setForm({ ...form, session_type: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
+                    <option value="">Select...</option>
+                    {SLOT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Focus</label>
+                  <input type="text" value={form.focus} onChange={(e) => setForm({ ...form, focus: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" placeholder="e.g. Passing, Serving" />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Notes</label>
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm resize-none" />
+                </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
-              <button onClick={save} disabled={!form.player_id || !form.date || !form.focus || saving}
-                className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
-                {saving ? "Saving..." : "Save"}
-              </button>
+            <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-100">
+              <div className="flex gap-2">
+                <button onClick={() => setShowLog(false)} className="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl font-medium">Cancel</button>
+                <button onClick={save} disabled={!form.player_id || !form.date || !form.focus || saving}
+                  className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
