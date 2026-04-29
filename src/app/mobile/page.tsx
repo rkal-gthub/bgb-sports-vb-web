@@ -320,11 +320,43 @@ function ScheduleTab({ slots, players, playerName, formatTime, formatDate, reloa
   const dedupSlots = dedup(slots);
   const now = new Date();
   const upcoming = dedupSlots.filter((s) => new Date(s.start_time) >= now);
+  const past = dedupSlots.filter((s) => new Date(s.start_time) < now).sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
   const grouped = upcoming.reduce<Record<string, ScheduleSlot[]>>((acc, slot) => {
     const key = formatDate(slot.start_time);
     (acc[key] ??= []).push(slot);
     return acc;
   }, {});
+  const pastGrouped = past.reduce<Record<string, ScheduleSlot[]>>((acc, slot) => {
+    const key = formatDate(slot.start_time);
+    (acc[key] ??= []).push(slot);
+    return acc;
+  }, {});
+
+  function SlotCard({ slot }: { slot: ScheduleSlot }) {
+    return (
+      <button onClick={() => setEditSlot(slot)} className="w-full text-left bg-white rounded-xl border border-slate-200 p-3 active:bg-slate-50">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-900 text-sm">{formatTime(slot.start_time)} – {formatTime(slot.end_time)}</span>
+              {slot.slot_type && <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">{slot.slot_type}</span>}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">{slot.location}</p>
+          </div>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            getPlayerIds(slot).length >= getMaxPlayers(slot) ? "bg-orange-50 text-orange-700" : "bg-green-50 text-green-700"
+          }`}>{getPlayerIds(slot).length}/{getMaxPlayers(slot)}</span>
+        </div>
+        {getPlayerIds(slot).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {getPlayerIds(slot).map((id) => (
+              <span key={id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{playerName(id)}</span>
+            ))}
+          </div>
+        )}
+      </button>
+    );
+  }
 
   return (
     <div className="px-4 pt-6">
@@ -342,32 +374,24 @@ function ScheduleTab({ slots, players, playerName, formatTime, formatDate, reloa
           <div key={date} className="mb-5">
             <h2 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">{date}</h2>
             <div className="space-y-2">
-              {dateSlots.map((slot) => (
-                <button key={slot.id} onClick={() => setEditSlot(slot)} className="w-full text-left bg-white rounded-xl border border-slate-200 p-3 active:bg-slate-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 text-sm">{formatTime(slot.start_time)} – {formatTime(slot.end_time)}</span>
-                        {slot.slot_type && <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">{slot.slot_type}</span>}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{slot.location}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      getPlayerIds(slot).length >= getMaxPlayers(slot) ? "bg-orange-50 text-orange-700" : "bg-green-50 text-green-700"
-                    }`}>{getPlayerIds(slot).length}/{getMaxPlayers(slot)}</span>
-                  </div>
-                  {getPlayerIds(slot).length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {getPlayerIds(slot).map((id) => (
-                        <span key={id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{playerName(id)}</span>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
+              {dateSlots.map((slot) => <SlotCard key={slot.id} slot={slot} />)}
             </div>
           </div>
         ))
+      )}
+
+      {Object.keys(pastGrouped).length > 0 && (
+        <details className="mt-6 mb-8">
+          <summary className="text-xs font-semibold text-slate-400 cursor-pointer mb-3 uppercase tracking-wide">Past Sessions ({past.length})</summary>
+          {Object.entries(pastGrouped).map(([date, dateSlots]) => (
+            <div key={date} className="mb-4">
+              <h2 className="text-xs font-semibold text-slate-400 mb-2">{date}</h2>
+              <div className="space-y-2 opacity-75">
+                {dateSlots.map((slot) => <SlotCard key={slot.id} slot={slot} />)}
+              </div>
+            </div>
+          ))}
+        </details>
       )}
 
       {showBook && <BookSessionSheet players={players} onClose={() => setShowBook(false)} reload={reload} />}
