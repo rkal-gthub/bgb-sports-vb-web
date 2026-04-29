@@ -8,6 +8,26 @@ import { getPlayerIds, getMaxPlayers } from "@/lib/helpers";
 
 type Tab = "dashboard" | "schedule" | "players" | "sessions";
 
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) return;
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [locked]);
+}
+
 export default function MobileApp() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [players, setPlayers] = useState<Player[]>([]);
@@ -361,6 +381,7 @@ function ScheduleTab({ slots, players, playerName, formatTime, formatDate, reloa
 function BookSessionSheet({ players, onClose, reload }: {
   players: Player[]; onClose: () => void; reload: () => Promise<void>;
 }) {
+  useBodyScrollLock(true);
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [saving, setSaving] = useState(false);
@@ -496,6 +517,7 @@ function EditBookingSheet({ slot, players, playerName, formatTime, onClose, relo
   slot: ScheduleSlot; players: Player[]; playerName: (id: string) => string;
   formatTime: (s: string) => string; onClose: () => void; reload: () => Promise<void>;
 }) {
+  useBodyScrollLock(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -628,6 +650,7 @@ function PlayersTab({ players, reload }: { players: Player[]; reload: () => Prom
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  useBodyScrollLock(showAdd);
   const [form, setForm] = useState({ full_name: "", team: "", player_position: "", skill_level: "", shoots: "" });
 
   const filtered = players.filter((p) =>
@@ -774,6 +797,7 @@ function SessionsTab({ sessions, slots, players, playerName, formatShortDate, re
   const [saving, setSaving] = useState(false);
   const blankForm = { player_id: "", date: "", session_type: "", focus: "", notes: "" };
   const [form, setForm] = useState(blankForm);
+  useBodyScrollLock(showLog);
 
   async function save() {
     setSaving(true);
