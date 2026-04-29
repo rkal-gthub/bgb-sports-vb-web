@@ -35,6 +35,7 @@ export default function MobileApp() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDashboardBook, setShowDashboardBook] = useState(false);
+  const [dashEditSlot, setDashEditSlot] = useState<ScheduleSlot | null>(null);
 
   const load = useCallback(async () => {
     const [p, sl, se] = await Promise.all([
@@ -87,8 +88,9 @@ export default function MobileApp() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <div className="flex-1 overflow-auto pb-20">
         {tab === "dashboard" && <>
-          <DashboardTab players={players} slots={slots} sessions={sessions} playerName={playerName} formatTime={formatTime} formatDate={formatDate} formatShortDate={formatShortDate} setTab={setTab} dedup={dedup} onBook={() => setShowDashboardBook(true)} />
+          <DashboardTab players={players} slots={slots} sessions={sessions} playerName={playerName} formatTime={formatTime} formatDate={formatDate} formatShortDate={formatShortDate} setTab={setTab} dedup={dedup} onBook={() => setShowDashboardBook(true)} onEditSlot={setDashEditSlot} />
           {showDashboardBook && <BookSessionSheet players={players} onClose={() => setShowDashboardBook(false)} reload={load} />}
+          {dashEditSlot && <EditBookingSheet slot={dashEditSlot} players={players} playerName={playerName} formatTime={formatTime} onClose={() => { setDashEditSlot(null); load(); }} reload={load} />}
         </>}
         {tab === "schedule" && <ScheduleTab slots={slots} players={players} playerName={playerName} formatTime={formatTime} formatDate={formatDate} reload={load} dedup={dedup} />}
         {tab === "players" && <PlayersTab players={players} reload={load} />}
@@ -167,12 +169,12 @@ const TIME_OPTIONS = timeOptions();
 
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
-function DashboardTab({ players, slots, sessions, playerName, formatTime, formatDate, formatShortDate, setTab, dedup, onBook }: {
+function DashboardTab({ players, slots, sessions, playerName, formatTime, formatDate, formatShortDate, setTab, dedup, onBook, onEditSlot }: {
   players: Player[]; slots: ScheduleSlot[]; sessions: Session[];
   playerName: (id: string) => string; formatTime: (s: string) => string;
   formatDate: (s: string) => string; formatShortDate: (s: string) => string;
   setTab: (t: Tab) => void; dedup: (s: ScheduleSlot[]) => ScheduleSlot[];
-  onBook: () => void;
+  onBook: () => void; onEditSlot: (slot: ScheduleSlot) => void;
 }) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -256,7 +258,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
         ) : (
           <div className="space-y-2">
             {todaySlots.map((slot) => (
-              <div key={slot.id} className="bg-white rounded-xl border border-slate-200 p-3">
+              <button key={slot.id} onClick={() => onEditSlot(slot)} className="w-full text-left bg-white rounded-xl border border-slate-200 p-3 active:bg-slate-50">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
@@ -271,7 +273,7 @@ function DashboardTab({ players, slots, sessions, playerName, formatTime, format
                     )) : <span className="text-xs text-green-600 font-medium">Open</span>}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -319,8 +321,9 @@ function ScheduleTab({ slots, players, playerName, formatTime, formatDate, reloa
 
   const dedupSlots = dedup(slots);
   const now = new Date();
-  const upcoming = dedupSlots.filter((s) => new Date(s.start_time) >= now);
-  const past = dedupSlots.filter((s) => new Date(s.start_time) < now).sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const upcoming = dedupSlots.filter((s) => new Date(s.start_time) >= todayStart);
+  const past = dedupSlots.filter((s) => new Date(s.start_time) < todayStart).sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
   const grouped = upcoming.reduce<Record<string, ScheduleSlot[]>>((acc, slot) => {
     const key = formatDate(slot.start_time);
     (acc[key] ??= []).push(slot);
